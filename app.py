@@ -24,6 +24,7 @@ from flask_migrate import Migrate
 
 app = Flask(__name__)
 
+
 # Use DATABASE_URL environment variable if available, else default to SQLite for local development
 app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URL', 'sqlite:///walkie_talkie.db')
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
