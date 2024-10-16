@@ -1,0 +1,214 @@
+{% extends 'base.html' %}
+{% block content %}
+<h2>Analytics Dashboard</h2>
+
+<!-- Time Range Selection -->
+<form method="get" action="{{ url_for('analytics') }}" class="form-inline mb-4">
+  <label class="mr-2">Time Range:</label>
+  <select name="time_filter" id="time_filter" class="form-control mr-2" onchange="toggleCustomDateInputs()">
+      <option value="6_hours" {% if time_filter == '6_hours' %}selected{% endif %}>Last 6 Hours</option>
+      <option value="12_hours" {% if time_filter == '12_hours' %}selected{% endif %}>Last 12 Hours</option>
+      <option value="24_hours" {% if time_filter == '24_hours' %}selected{% endif %}>Last 24 Hours</option>
+      <option value="1_day" {% if time_filter == '1_day' %}selected{% endif %}>Last 1 Day</option>
+      <option value="2_days" {% if time_filter == '2_days' %}selected{% endif %}>Last 2 Days</option>
+      <option value="3_days" {% if time_filter == '3_days' %}selected{% endif %}>Last 3 Days</option>
+      <option value="7_days" {% if time_filter == '7_days' %}selected{% endif %}>Last 7 Days</option>
+      <option value="custom" {% if time_filter == 'custom' %}selected{% endif %}>Custom Range</option>
+  </select>
+  <div id="custom_date_inputs" class="form-inline" style="display: {% if time_filter == 'custom' %}block{% else %}none{% endif %};">
+      <label for="start_date" class="ml-2 mr-2">Start Date:</label>
+      <input type="datetime-local" name="start_date" id="start_date" class="form-control mr-2" value="{{ start_date.strftime('%Y-%m-%dT%H:%M') }}">
+      <label for="end_date" class="mr-2">End Date:</label>
+      <input type="datetime-local" name="end_date" id="end_date" class="form-control mr-2" value="{{ end_date.strftime('%Y-%m-%dT%H:%M') }}">
+  </div>
+  <button type="submit" class="btn btn-primary">Apply</button>
+</form>
+
+<div class="row">
+    <div class="col-md-6">
+        <h4>Overall Statistics</h4>
+        <ul class="list-group">
+            <li class="list-group-item">Total Walkie-Talkies: {{ total_wt }}</li>
+            <li class="list-group-item">Available: {{ available_wt }}</li>
+            <li class="list-group-item">Lent: {{ lent_wt }}</li>
+            <li class="list-group-item">Charged & Available: {{ charged_wt }}</li>
+            <li class="list-group-item">Average Rental Duration: 
+                {% if average_rental_duration %}
+                    {{ average_rental_duration|round(2) }} days
+                {% else %}
+                    N/A
+                {% endif %}
+            </li>
+        </ul>
+    </div>
+    <div class="col-md-6">
+        <h4>Lent Walkie-Talkies by Department/Person</h4>
+        <table class="table table-striped table-bordered">
+            <thead>
+                <tr>
+                    <th>Department/Person</th>
+                    <th>Number of Walkie-Talkies Lent</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for dept_name, count in lent_by_department %}
+                <tr>
+                    <td>{{ dept_name }}</td>
+                    <td>{{ count }}</td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="2">No current loans.</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<div class="row mt-4">
+    <div class="col">
+        <h4>Top 5 Frequent Borrowers</h4>
+        <table class="table table-striped table-bordered">
+            <thead>
+                <tr>
+                    <th>Department/Person</th>
+                    <th>Total Rentals</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for dept_name, count in frequent_borrowers %}
+                <tr>
+                    <td>{{ dept_name }}</td>
+                    <td>{{ count }}</td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="2">No rental history.</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<div class="row mt-4">
+    <div class="col">
+        <h4>Top 5 Frequently Used Walkie-Talkies</h4>
+        <table class="table table-striped table-bordered">
+            <thead>
+                <tr>
+                    <th>Walkie-Talkie ID</th>
+                    <th>Total Rentals</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for wt_id, count in frequent_walkie_talkies %}
+                <tr>
+                    <td>{{ wt_id }}</td>
+                    <td>{{ count }}</td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="2">No rental history.</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<div class="row mt-4">
+    <div class="col">
+        <h4>Utilization Rate Over the Last 7 Days</h4>
+        <canvas id="utilizationChart"></canvas>
+    </div>
+</div>
+
+<div class="row mt-4">
+    <div class="col">
+        <h4>Rental and Return Trends Over the Last 7 Days</h4>
+        <canvas id="rentalTrendsChart"></canvas>
+    </div>
+</div>
+
+<a href="{{ url_for('index') }}" class="btn btn-secondary mt-3">Back to Home</a>
+
+<!-- Include Chart.js -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<script>
+    // Utilization Chart
+    const ctx = document.getElementById('utilizationChart').getContext('2d');
+    const utilizationData = {
+        labels: [{% for data in utilization_data %}'{{ data.date }}',{% endfor %}],
+        datasets: [{
+            label: 'Utilization Rate (%)',
+            data: [{% for data in utilization_data %}{{ data.utilization_rate|round(2) }},{% endfor %}],
+            backgroundColor: 'rgba(54, 162, 235, 0.5)',
+            borderColor: 'rgba(54, 162, 235, 1)',
+            fill: false,
+            tension: 0.1
+        }]
+    };
+    const config = {
+        type: 'line',
+        data: utilizationData,
+        options: {
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    max: 100
+                }
+            }
+        }
+    };
+    const utilizationChart = new Chart(ctx, config);
+
+    // Rental Trends Chart
+    const rentalCtx = document.getElementById('rentalTrendsChart').getContext('2d');
+    const rentalTrendsData = {
+        labels: [{% for data in rental_trends %}'{{ data.date }}',{% endfor %}],
+        datasets: [
+            {
+                label: 'Rentals',
+                data: [{% for data in rental_trends %}{{ data.rentals }},{% endfor %}],
+                backgroundColor: 'rgba(75, 192, 192, 0.5)',
+                borderColor: 'rgba(75, 192, 192, 1)',
+                fill: false,
+                tension: 0.1
+            },
+            {
+                label: 'Returns',
+                data: [{% for data in rental_trends %}{{ data.returns }},{% endfor %}],
+                backgroundColor: 'rgba(255, 159, 64, 0.5)',
+                borderColor: 'rgba(255, 159, 64, 1)',
+                fill: false,
+                tension: 0.1
+            }
+        ]
+    };
+    const rentalTrendsConfig = {
+        type: 'line',
+        data: rentalTrendsData,
+        options: {
+            scales: {
+                y: {
+                    beginAtZero: true
+                }
+            }
+        }
+    };
+    const rentalTrendsChart = new Chart(rentalCtx, rentalTrendsConfig);
+
+    function toggleCustomDateInputs() {
+    var timeFilter = document.getElementById('time_filter').value;
+    var customDateInputs = document.getElementById('custom_date_inputs');
+    if (timeFilter === 'custom') {
+        customDateInputs.style.display = 'block';
+    } else {
+        customDateInputs.style.display = 'none';
+    }
+}
+</script>
+{% endblock %}

@@ -1,0 +1,22 @@
+{% extends 'base.html' %}
+{% block content %}
+<h2>Add Walkie-Talkie</h2>
+{% if error %}
+<div class="alert alert-danger" role="alert">
+    {{ error }}
+</div>
+{% endif %}
+<form method="post">
+    <div class="form-group">
+        <label for="id">ID (optional):</label>
+        <input type="number" class="form-control" id="id" name="id" min="1">
+    </div>
+    <div class="form-group">
+        <label for="channel">Channel (optional, default is 1):</label>
+        <input type="number" class="form-control" id="channel" name="channel" min="1" max="15">
+    </div>
+    <!-- Removed the 'Fully Charged' checkbox -->
+    <button type="submit" class="btn btn-primary">Add</button>
+    <a href="{{ url_for('index') }}" class="btn btn-secondary">Cancel</a>
+</form>
+{% endblock %}

@@ -1,0 +1,25 @@
+{% extends 'base.html' %}
+{% block content %}
+<h2>Edit Walkie-Talkie ID: {{ wt.id }}</h2>
+{% if error %}
+<div class="alert alert-danger" role="alert">
+    {{ error }}
+</div>
+{% endif %}
+<form method="post">
+    <div class="form-group">
+        <label for="id">ID:</label>
+        <input type="number" class="form-control" id="id" name="id" value="{{ wt.id }}" required>
+    </div>
+    <div class="form-group">
+        <label for="channel">Channel (optional, default is 1):</label>
+        <input type="number" class="form-control" id="channel" name="channel" value="{{ wt.channel }}">
+    </div>
+    <div class="form-group form-check">
+        <input type="checkbox" class="form-check-input" id="is_charged" name="is_charged" {% if wt.is_charged %}checked{% endif %}>
+        <label class="form-check-label" for="is_charged">Fully Charged</label>
+    </div>
+    <button type="submit" class="btn btn-primary">Update</button>
+    <a href="{{ url_for('view_walkie_talkie', wt_id=wt.id) }}" class="btn btn-secondary">Cancel</a>
+</form>
+{% endblock %}

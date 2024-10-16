@@ -1,0 +1,107 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="row mb-4">
+    <div class="col">
+        <h5>Total Walkie-Talkies: {{ total_wt }}</h5>
+        <h5>Available: {{ available_wt }}</h5>
+        <h5>Lent: {{ lent_wt }}</h5>
+        <h5>Charged & Available: {{ charged_wt }}</h5>
+    </div>
+</div>
+<div class="mb-3">
+    <a href="{{ url_for('add_walkie_talkie') }}" class="btn btn-success">
+        <i class="fas fa-plus"></i> Add Walkie-Talkie
+    </a>
+    <a href="{{ url_for('add_department') }}" class="btn btn-info">
+        <i class="fas fa-user-plus"></i> Add Department/Person
+    </a>
+    <a href="{{ url_for('departments') }}" class="btn btn-secondary">
+        <i class="fas fa-users"></i> View Departments/Persons
+    </a>
+    <a href="{{ url_for('analytics') }}" class="btn btn-primary">
+        <i class="fas fa-chart-line"></i> Analytics Dashboard
+    </a>
+</div>
+
+<table class="table table-striped table-bordered">
+    <thead class="thead-dark">
+        <tr>
+            <th>ID</th>
+            <th>Channel</th>
+            <th>Status</th>
+            <th>Charged</th>
+            <th>Current Holder</th>
+            <th>Actions</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for wt in walkie_talkies %}
+        <tr class="{% if wt.is_lent %}lent-row{% endif %}">
+            <td>{{ wt.id }}</td>
+            <td>{{ wt.channel }}</td>
+            <td>
+                {% if wt.is_lent %}
+                    <span class="badge badge-danger" data-toggle="tooltip" title="Lent to {{ wt.current_holder }}">
+                        <i class="fas fa-times-circle"></i> Lent
+                    </span>
+                {% else %}
+                    <span class="badge badge-success" data-toggle="tooltip" title="Available for lending">
+                        <i class="fas fa-check-circle"></i> Available
+                    </span>
+                {% endif %}
+            </td>
+            <td>
+                {% if wt.is_charged %}
+                    <span class="badge badge-success" data-toggle="tooltip" title="Fully Charged">
+                        <i class="fas fa-battery-full"></i>
+                    </span>
+                {% else %}
+                    <span class="badge badge-danger" data-toggle="tooltip" title="Not Charged">
+                        <i class="fas fa-battery-empty"></i>
+                    </span>
+                {% endif %}
+            </td>
+            <td>{{ wt.current_holder or 'N/A' }}</td>
+            <td>
+                <a href="{{ url_for('view_walkie_talkie', wt_id=wt.id) }}" class="btn btn-sm btn-primary" data-toggle="tooltip" title="View Details">
+                    <i class="fas fa-eye"></i>
+                </a>
+                <a href="{{ url_for('edit_walkie_talkie', wt_id=wt.id) }}" class="btn btn-sm btn-warning" data-toggle="tooltip" title="Edit">
+                    <i class="fas fa-edit"></i>
+                </a>
+                {% if not wt.is_lent %}
+                    <a href="{{ url_for('lend_walkie_talkie', wt_id=wt.id) }}" class="btn btn-sm btn-success" data-toggle="tooltip" title="Lend">
+                        <i class="fas fa-share-square"></i>
+                    </a>
+                {% else %}
+                    <a href="{{ url_for('return_walkie_talkie', wt_id=wt.id) }}" class="btn btn-sm btn-info" data-toggle="tooltip" title="Return">
+                        <i class="fas fa-undo"></i>
+                    </a>
+                {% endif %}
+                <form action="{{ url_for('toggle_charge_status', wt_id=wt.id) }}" method="post" style="display:inline;">
+                    <button type="submit" class="btn btn-sm {% if wt.is_charged %}btn-secondary{% else %}btn-success{% endif %}" data-toggle="tooltip" title="Toggle Charge Status">
+                        {% if wt.is_charged %}
+                            <i class="fas fa-battery-empty"></i> Discharge
+                        {% else %}
+                            <i class="fas fa-battery-full"></i> Charge
+                        {% endif %}
+                    </button>
+                </form>
+                <form action="{{ url_for('delete_walkie_talkie', wt_id=wt.id) }}" method="post" style="display:inline;">
+                    <button type="submit" class="btn btn-sm btn-danger" onclick="return confirm('Are you sure you want to delete this walkie-talkie?');" data-toggle="tooltip" title="Delete">
+                        <i class="fas fa-trash-alt"></i>
+                    </button>
+                </form>
+            </td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+
+<!-- Initialize tooltips -->
+<script>
+    $(document).ready(function(){
+        $('[data-toggle="tooltip"]').tooltip();
+    });
+</script>
+{% endblock %}

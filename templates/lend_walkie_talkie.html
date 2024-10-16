@@ -1,0 +1,19 @@
+<!-- templates/lend_walkie_talkie.html -->
+{% extends 'base.html' %}
+{% block content %}
+<h2>Lend Walkie-Talkie ID: {{ wt.id }}</h2>
+{% if departments %}
+    <form method="post">
+        <label for="department">Select Department/Person:</label>
+        <select name="department" required>
+            {% for dept in departments %}
+            <option value="{{ dept.id }}">{{ dept.name }}</option>
+            {% endfor %}
+        </select>
+        <input type="submit" value="Lend">
+    </form>
+{% else %}
+    <p>No departments/persons available. Please <a href="{{ url_for('add_department') }}">add a department/person</a> first.</p>
+{% endif %}
+<a href="{{ url_for('view_walkie_talkie', wt_id=wt.id) }}">Back</a>
+{% endblock %}
