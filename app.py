@@ -41,3 +41,6 @@ migrate = Migrate(app, db)
 
 # Import routes
 import routes
+
+if __name__ == '__app__':
+    app.run()
