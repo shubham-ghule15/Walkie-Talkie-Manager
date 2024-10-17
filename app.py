@@ -18,12 +18,10 @@
 # app.py
 import os
 from flask import Flask
-from models import db
 from flask_migrate import Migrate
-
+from models import db  # Import db here
 
 app = Flask(__name__)
-
 
 # Use DATABASE_URL environment variable if available, else default to SQLite for local development
 app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URL', 'sqlite:///walkie_talkie.db')
@@ -32,8 +30,12 @@ app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'your_secret_key_here')
 
 db.init_app(app)
 
-migrate = Migrate(app, db)
+# Import models within app context
+with app.app_context():
+    # Import your models here
+    from models import WalkieTalkie, Department, Rental
 
+migrate = Migrate(app, db)
 
 # Remove or comment out db.create_all() if using migrations
 # with app.app_context():
@@ -42,5 +44,5 @@ migrate = Migrate(app, db)
 # Import routes
 import routes
 
-if __name__ == '__app__':
+if __name__ == '__main__':
     app.run()
