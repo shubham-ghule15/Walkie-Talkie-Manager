@@ -50,19 +50,34 @@
     </tbody>
 </table>
 
-{% if not walkie_talkies %}
-    <p>No walkie-talkies found matching your criteria.</p>
-{% endif %}
+<!-- No Results Message -->
+<p id="no-results-message" class="text-center text-muted" style="display: none;">
+    No walkie-talkies found matching your criteria.
+</p>
 
 <a href="{{ url_for('add_walkie_talkie') }}" class="btn btn-success">Add New Walkie-Talkie</a>
 
-<!-- Custom JavaScript for Real-Time Search -->
+<!-- Pagination Controls (Optional) -->
+<nav aria-label="Page navigation" id="pagination-nav">
+  <!-- Pagination buttons will be dynamically generated -->
+</nav>
+
+<!-- Initialize tooltips -->
+<script>
+    $(document).ready(function(){
+        $('[data-toggle="tooltip"]').tooltip();
+    });
+</script>
+
+<!-- Custom JavaScript for Real-Time Search and Handling No Results -->
 <script>
 $(document).ready(function() {
     // Function to fetch and display walkie-talkies
     function fetchWalkieTalkies(page = 1) {
         // Show loading spinner
         $('#loading-spinner').show();
+        // Hide no results message
+        $('#no-results-message').hide();
 
         // Get filter values
         var search = $('#search').val().trim();
@@ -129,10 +144,8 @@ $(document).ready(function() {
                         );
                     });
                 } else {
-                    // No walkie-talkies found
-                    $('#walkie-talkies-table tbody').append(
-                        '<tr><td colspan="6" class="text-center">No walkie-talkies found matching your criteria.</td></tr>'
-                    );
+                    // Show no results message
+                    $('#no-results-message').show();
                 }
 
                 // Handle Pagination (If Implemented)
@@ -148,6 +161,9 @@ $(document).ready(function() {
 
                 // Clear existing table body
                 $('#walkie-talkies-table tbody').empty();
+
+                // Hide no results message
+                $('#no-results-message').hide();
 
                 if (xhr.responseJSON && xhr.responseJSON.error) {
                     $('#walkie-talkies-table tbody').append(
