@@ -1,3 +1,5 @@
+
+<!-- walkie_talkie.html -->
 {% extends 'base.html' %}
 {% block content %}
 <h2>Walkie-Talkie Details</h2>
@@ -19,6 +21,7 @@
 </div>
 
 <h3>Rental History</h3>
+{% if rentals %}
 <table class="table table-striped table-bordered">
     <thead>
         <tr>
@@ -38,5 +41,15 @@
     </tbody>
 </table>
 
-<a href="{{ url_for('index') }}" class="btn btn-secondary">Back</a>
+<!-- Delete Rental History Button -->
+<form action="{{ url_for('delete_rental_history', wt_id=wt.id) }}" method="post" onsubmit="return confirm('Are you sure you want to delete all rental history for this walkie-talkie? This action cannot be undone.');">
+    <button type="submit" class="btn btn-danger">
+        <i class="fas fa-trash-alt"></i> Delete Rental History
+    </button>
+</form>
+{% else %}
+    <p>No rental history available for this walkie-talkie.</p>
+{% endif %}
+
+<a href="{{ url_for('index') }}" class="btn btn-secondary mt-3">Back</a>
 {% endblock %}

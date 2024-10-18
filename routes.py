@@ -365,3 +365,25 @@ def analytics():
                            time_filter=time_filter,
                            start_date=start_date,
                            end_date=end_date)
+
+# routes.py
+
+@app.route('/walkie_talkie/<int:wt_id>/delete_rental_history', methods=['POST'])
+def delete_rental_history(wt_id):
+    wt = WalkieTalkie.query.get_or_404(wt_id)
+    rental_history = Rental.query.filter_by(walkie_talkie_id=wt_id).all()
+    
+    if not rental_history:
+        flash('No rental history found for this walkie-talkie.', 'info')
+        return redirect(url_for('view_walkie_talkie', wt_id=wt_id))
+    
+    try:
+        for rental in rental_history:
+            db.session.delete(rental)
+        db.session.commit()
+        flash('Rental history deleted successfully.', 'success')
+    except Exception as e:
+        db.session.rollback()
+        flash(f'An error occurred while deleting rental history: {str(e)}', 'danger')
+    
+    return redirect(url_for('view_walkie_talkie', wt_id=wt_id))
