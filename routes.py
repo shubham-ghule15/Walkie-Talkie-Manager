@@ -1,9 +1,12 @@
 # routes.py
 from app import app
-from flask import render_template, request, redirect, url_for, flash
 from models import db, WalkieTalkie, Department, Rental, get_ist_now
 from datetime import datetime, timedelta
 from sqlalchemy import func
+from flask import Flask, render_template, request, redirect, url_for, flash, jsonify
+from sqlalchemy import or_
+import json
+
 
 @app.route('/')
 def index():
@@ -387,3 +390,69 @@ def delete_rental_history(wt_id):
         flash(f'An error occurred while deleting rental history: {str(e)}', 'danger')
     
     return redirect(url_for('view_walkie_talkie', wt_id=wt_id))
+
+
+@app.route('/walkie_talkies', methods=['GET'])
+def list_walkie_talkies():
+    """
+    Renders the walkie-talkies listing page.
+    Initially loads all walkie-talkies; subsequent filtering is handled via AJAX.
+    """
+    return render_template('list_walkie_talkies.html')
+
+
+
+@app.route('/api/walkie_talkies', methods=['GET'])
+def api_walkie_talkies():
+    """
+    API endpoint to fetch walkie-talkie data based on search and filter parameters.
+    Returns JSON data.
+    """
+    # Retrieve query parameters
+    search_query = request.args.get('search', '').strip()
+    filter_status = request.args.get('status', 'all').lower()
+    filter_channel = request.args.get('channel', '').strip()
+
+    # Start building the query
+    walkie_talkies_query = WalkieTalkie.query
+
+    # Apply search filter (e.g., by ID)
+    if search_query:
+        if search_query.isdigit():
+            walkie_talkies_query = walkie_talkies_query.filter(WalkieTalkie.id == int(search_query))
+        else:
+            return jsonify({'error': 'Please enter a valid numeric ID for searching.'}), 400
+
+    # Apply status filter
+    if filter_status in ['lent', 'available', 'charged']:
+        if filter_status == 'lent':
+            walkie_talkies_query = walkie_talkies_query.filter_by(is_lent=True)
+        elif filter_status == 'available':
+            walkie_talkies_query = walkie_talkies_query.filter_by(is_lent=False)
+        elif filter_status == 'charged':
+            walkie_talkies_query = walkie_talkies_query.filter_by(is_charged=True)
+    elif filter_status != 'all':
+        return jsonify({'error': 'Invalid status selected.'}), 400
+
+    # Apply channel filter
+    if filter_channel:
+        if filter_channel.isdigit() and int(filter_channel) > 0:
+            walkie_talkies_query = walkie_talkies_query.filter_by(channel=int(filter_channel))
+        else:
+            return jsonify({'error': 'Please enter a valid positive integer for channel number.'}), 400
+
+    # Execute the query
+    walkie_talkies = walkie_talkies_query.all()
+
+    # Serialize data
+    walkie_talkies_data = []
+    for wt in walkie_talkies:
+        walkie_talkies_data.append({
+            'id': wt.id,
+            'channel': wt.channel,
+            'is_lent': wt.is_lent,
+            'is_charged': wt.is_charged,
+            'current_holder': wt.current_holder if wt.current_holder else 'N/A'
+        })
+
+    return jsonify({'walkie_talkies': walkie_talkies_data}), 200

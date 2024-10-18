@@ -1,0 +1,241 @@
+<!-- templates/list_walkie_talkies.html -->
+{% extends 'base.html' %}
+{% block content %}
+<h2>All Walkie-Talkies</h2>
+
+<!-- Search and Filter Form -->
+<form id="search-form" class="row g-3 mb-4">
+    <div class="col-md-4">
+        <input type="text" name="search" id="search" class="form-control" placeholder="Search by ID">
+    </div>
+    <div class="col-md-3">
+        <select name="status" id="status" class="form-select">
+            <option value="all">All Statuses</option>
+            <option value="lent">Lent</option>
+            <option value="available">Available</option>
+            <option value="charged">Charged</option>
+        </select>
+    </div>
+    <div class="col-md-3">
+        <input type="number" name="channel" id="channel" class="form-control" placeholder="Channel Number" min="1">
+    </div>
+    <div class="col-md-2 d-flex align-items-end">
+        <!-- Optional: Retain the Search button as a fallback -->
+        <button type="submit" class="btn btn-primary w-100">Search</button>
+    </div>
+</form>
+
+<!-- Loading Spinner (Optional) -->
+<div id="loading-spinner" style="display: none;" class="text-center mb-3">
+    <div class="spinner-border text-primary" role="status">
+        <span class="sr-only">Loading...</span>
+    </div>
+</div>
+
+<!-- Walkie-Talkies Table -->
+<table class="table table-striped table-bordered" id="walkie-talkies-table">
+    <thead>
+        <tr>
+            <th>ID</th>
+            <th>Channel</th>
+            <th>Status</th>
+            <th>Charging Status</th> <!-- Updated Column Header -->
+            <th>Current Holder</th>
+            <th>Actions</th>
+        </tr>
+    </thead>
+    <tbody>
+        <!-- Rows will be populated via AJAX -->
+    </tbody>
+</table>
+
+{% if not walkie_talkies %}
+    <p>No walkie-talkies found matching your criteria.</p>
+{% endif %}
+
+<a href="{{ url_for('add_walkie_talkie') }}" class="btn btn-success">Add New Walkie-Talkie</a>
+
+<!-- Custom JavaScript for Real-Time Search -->
+<script>
+$(document).ready(function() {
+    // Function to fetch and display walkie-talkies
+    function fetchWalkieTalkies(page = 1) {
+        // Show loading spinner
+        $('#loading-spinner').show();
+
+        // Get filter values
+        var search = $('#search').val().trim();
+        var status = $('#status').val();
+        var channel = $('#channel').val().trim();
+
+        // Build query parameters
+        var params = { page: page };
+        if (search !== '') {
+            params.search = search;
+        }
+        if (status !== 'all') {
+            params.status = status;
+        }
+        if (channel !== '') {
+            params.channel = channel;
+        }
+
+        // Send AJAX GET request to the API
+        $.ajax({
+            url: "{{ url_for('api_walkie_talkies') }}",
+            type: 'GET',
+            data: params,
+            dataType: 'json',
+            success: function(response) {
+                // Hide loading spinner
+                $('#loading-spinner').hide();
+
+                // Clear existing table body
+                $('#walkie-talkies-table tbody').empty();
+
+                // Check if walkie-talkies are present
+                if (response.walkie_talkies.length > 0) {
+                    // Iterate through walkie-talkies and append rows
+                    $.each(response.walkie_talkies, function(index, wt) {
+                        // Determine status badge
+                        var statusBadge = wt.is_lent ? 
+                            '<span class="badge badge-danger">Lent</span>' : 
+                            '<span class="badge badge-success">Available</span>';
+
+                        // Determine charging status badge with battery icons
+                        var chargingBadge = wt.is_charged ? 
+                            '<i class="fas fa-battery-full text-success battery-icon" title="Charged"></i>' : 
+                            '<i class="fas fa-battery-empty text-danger battery-icon" title="Discharged"></i>';
+
+                        // Determine action buttons
+                        var actionButtons = '<a href="/walkie_talkie/' + wt.id + '" class="btn btn-info btn-sm">View</a> ';
+                        if (!wt.is_lent) {
+                            actionButtons += '<a href="/lend_walkie_talkie/' + wt.id + '" class="btn btn-primary btn-sm">Lend</a>';
+                        } else {
+                            actionButtons += '<a href="/return_walkie_talkie/' + wt.id + '" class="btn btn-warning btn-sm">Return</a>';
+                        }
+
+                        // Append the row
+                        $('#walkie-talkies-table tbody').append(
+                            '<tr' + (wt.is_lent ? ' class="lent-row"' : '') + '>' +
+                                '<td>' + wt.id + '</td>' +
+                                '<td>' + wt.channel + '</td>' +
+                                '<td>' + statusBadge + '</td>' +
+                                '<td>' + chargingBadge + '</td>' + // Updated Charging Status Column
+                                '<td>' + wt.current_holder + '</td>' +
+                                '<td>' + actionButtons + '</td>' +
+                            '</tr>'
+                        );
+                    });
+                } else {
+                    // No walkie-talkies found
+                    $('#walkie-talkies-table tbody').append(
+                        '<tr><td colspan="6" class="text-center">No walkie-talkies found matching your criteria.</td></tr>'
+                    );
+                }
+
+                // Handle Pagination (If Implemented)
+                if (response.pages && response.pages > 1) {
+                    renderPagination(response);
+                } else {
+                    $('#pagination-nav').empty();
+                }
+            },
+            error: function(xhr, status, error) {
+                // Hide loading spinner
+                $('#loading-spinner').hide();
+
+                // Clear existing table body
+                $('#walkie-talkies-table tbody').empty();
+
+                if (xhr.responseJSON && xhr.responseJSON.error) {
+                    $('#walkie-talkies-table tbody').append(
+                        '<tr><td colspan="6" class="text-center text-danger">Error: ' + xhr.responseJSON.error + '</td></tr>'
+                    );
+                } else {
+                    $('#walkie-talkies-table tbody').append(
+                        '<tr><td colspan="6" class="text-center text-danger">An unexpected error occurred.</td></tr>'
+                    );
+                }
+            }
+        });
+    }
+
+    // Function to render pagination controls (Optional)
+    function renderPagination(response) {
+        $('#pagination-nav').empty();
+        var paginationHTML = '<ul class="pagination justify-content-center">';
+        
+        // Previous button
+        if (response.has_prev) {
+            paginationHTML += '<li class="page-item"><a class="page-link" href="#" data-page="' + (response.current_page - 1) + '">Previous</a></li>';
+        } else {
+            paginationHTML += '<li class="page-item disabled"><a class="page-link" href="#">Previous</a></li>';
+        }
+
+        // Page numbers
+        for (var i = 1; i <= response.pages; i++) {
+            if (i === response.current_page) {
+                paginationHTML += '<li class="page-item active"><a class="page-link" href="#" data-page="' + i + '">' + i + '</a></li>';
+            } else {
+                paginationHTML += '<li class="page-item"><a class="page-link" href="#" data-page="' + i + '">' + i + '</a></li>';
+            }
+        }
+
+        // Next button
+        if (response.has_next) {
+            paginationHTML += '<li class="page-item"><a class="page-link" href="#" data-page="' + (response.current_page + 1) + '">Next</a></li>';
+        } else {
+            paginationHTML += '<li class="page-item disabled"><a class="page-link" href="#">Next</a></li>';
+        }
+
+        paginationHTML += '</ul>';
+        $('#pagination-nav').append(paginationHTML);
+    }
+
+    // Initial fetch on page load
+    fetchWalkieTalkies();
+
+    // Debounce function to limit the rate of AJAX calls
+    function debounce(func, delay) {
+        var inDebounce;
+        return function() {
+            var context = this;
+            var args = arguments;
+            clearTimeout(inDebounce);
+            inDebounce = setTimeout(function() {
+                func.apply(context, args);
+            }, delay);
+        }
+    }
+
+    // Event listeners for real-time search and filter
+    $('#search').on('keyup', debounce(function() {
+        fetchWalkieTalkies();
+    }, 300)); // 300ms delay
+
+    $('#status').on('change', function() {
+        fetchWalkieTalkies();
+    });
+
+    $('#channel').on('keyup', debounce(function() {
+        fetchWalkieTalkies();
+    }, 300)); // 300ms delay
+
+    // Handle form submission if the search button is pressed
+    $('#search-form').on('submit', function(e) {
+        e.preventDefault(); // Prevent default form submission
+        fetchWalkieTalkies();
+    });
+
+    // Event listener for pagination clicks (If Implemented)
+    $(document).on('click', '.pagination a.page-link', function(e) {
+        e.preventDefault();
+        var page = $(this).data('page');
+        if (page) {
+            fetchWalkieTalkies(page);
+        }
+    });
+});
+</script>
+{% endblock %}
