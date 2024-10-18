@@ -1,4 +1,3 @@
-
 <!-- walkie_talkie.html -->
 {% extends 'base.html' %}
 {% block content %}
@@ -41,12 +40,15 @@
     </tbody>
 </table>
 
-<!-- Delete Rental History Button -->
+{% if not wt.is_lent %}
 <form action="{{ url_for('delete_rental_history', wt_id=wt.id) }}" method="post" onsubmit="return confirm('Are you sure you want to delete all rental history for this walkie-talkie? This action cannot be undone.');">
     <button type="submit" class="btn btn-danger">
         <i class="fas fa-trash-alt"></i> Delete Rental History
     </button>
 </form>
+{% else %}
+    <p class="text-danger">Cannot delete rental history while the walkie-talkie is currently lent out.</p>
+{% endif %}
 {% else %}
     <p>No rental history available for this walkie-talkie.</p>
 {% endif %}

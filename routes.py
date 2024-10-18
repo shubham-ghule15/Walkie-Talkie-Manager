@@ -1,7 +1,7 @@
 # routes.py
 from app import app
 from flask import render_template, request, redirect, url_for, flash
-from models import db, WalkieTalkie, Department, Rental
+from models import db, WalkieTalkie, Department, Rental, get_ist_now
 from datetime import datetime, timedelta
 from sqlalchemy import func
 
@@ -92,7 +92,7 @@ def return_walkie_talkie(wt_id):
     wt = WalkieTalkie.query.get_or_404(wt_id)
     rental = Rental.query.filter_by(walkie_talkie_id=wt_id, return_time=None).first()
     if rental:
-        rental.return_time = datetime.now()
+        rental.return_time = get_ist_now()  # Set return_time in IST
         wt.is_lent = False
         wt.current_holder = None
         wt.is_charged = False  # Set to discharged upon return
@@ -198,7 +198,7 @@ def analytics():
     start_date_str = request.args.get('start_date')
     end_date_str = request.args.get('end_date')
 
-    now = datetime.now()
+    now = get_ist_now()
 
     # Handle custom date range
     if time_filter == 'custom' and start_date_str and end_date_str:
