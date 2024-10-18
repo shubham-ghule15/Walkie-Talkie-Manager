@@ -424,13 +424,15 @@ def api_walkie_talkies():
             return jsonify({'error': 'Please enter a valid numeric ID for searching.'}), 400
 
     # Apply status filter
-    if filter_status in ['lent', 'available', 'charged']:
+    if filter_status in ['lent', 'available', 'charged', 'available_and_charged']:
         if filter_status == 'lent':
             walkie_talkies_query = walkie_talkies_query.filter_by(is_lent=True)
         elif filter_status == 'available':
             walkie_talkies_query = walkie_talkies_query.filter_by(is_lent=False)
         elif filter_status == 'charged':
             walkie_talkies_query = walkie_talkies_query.filter_by(is_charged=True)
+        elif filter_status == 'available_and_charged':
+            walkie_talkies_query = walkie_talkies_query.filter_by(is_lent=False, is_charged=True)
     elif filter_status != 'all':
         return jsonify({'error': 'Invalid status selected.'}), 400
 
