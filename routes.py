@@ -6,6 +6,8 @@ from sqlalchemy import func
 from flask import Flask, render_template, request, redirect, url_for, flash, jsonify
 from sqlalchemy import or_
 import json
+from collections import defaultdict
+
 
 
 @app.route('/')
@@ -256,6 +258,25 @@ def analytics():
         Rental.lend_time >= start_date
     ).group_by(Department.name).all()
 
+    # Fetch walkie-talkie IDs per department/person
+    current_rentals = db.session.query(Rental).filter(
+        Rental.return_time == None,
+        Rental.lend_time <= end_date,
+        Rental.lend_time >= start_date
+    ).all()
+
+    walkie_talkies_by_department = defaultdict(list)
+
+    for rental in current_rentals:
+        dept_name = rental.department.name
+        walkie_talkies_by_department[dept_name].append(rental.walkie_talkie.id)
+
+    # Convert to list of tuples: (dept_name, count, list_of_wt_ids)
+    lent_walkie_talkies_by_department = [
+        (dept, len(ids), ids)
+        for dept, ids in walkie_talkies_by_department.items()
+    ]
+
     # Most frequent borrowers within the time range
     frequent_borrowers = db.session.query(
         Department.name,
@@ -305,7 +326,7 @@ def analytics():
 
             lent = Rental.query.filter(
                 Rental.lend_time <= period_end,
-                (Rental.return_time == None) | (Rental.return_time >= period_start)
+                or_(Rental.return_time == None, Rental.return_time >= period_start)
             ).count()
             utilization_rate = (lent / total_wt) * 100 if total_wt else 0
             utilization_data.append({
@@ -337,7 +358,7 @@ def analytics():
 
             lent = Rental.query.filter(
                 Rental.lend_time <= next_day,
-                (Rental.return_time == None) | (Rental.return_time >= day)
+                or_(Rental.return_time == None, Rental.return_time >= day)
             ).count()
             utilization_rate = (lent / total_wt) * 100 if total_wt else 0
             utilization_data.append({
@@ -360,6 +381,7 @@ def analytics():
                            available_wt=available_wt,
                            charged_wt=charged_wt,
                            lent_by_department=lent_by_department,
+                           lent_walkie_talkies_by_department=lent_walkie_talkies_by_department,
                            frequent_borrowers=frequent_borrowers,
                            average_rental_duration=average_rental_duration,
                            rental_trends=rental_trends,

@@ -48,17 +48,23 @@
                 <tr>
                     <th>Department/Person</th>
                     <th>Number of Walkie-Talkies Lent</th>
+                    <th>Walkie-Talkie IDs</th> <!-- New Column -->
                 </tr>
             </thead>
             <tbody>
-                {% for dept_name, count in lent_by_department %}
+                {% for dept, count, wt_ids in lent_walkie_talkies_by_department %}
                 <tr>
-                    <td>{{ dept_name }}</td>
+                    <td>{{ dept }}</td>
                     <td>{{ count }}</td>
+                    <td>
+                        {% for id in wt_ids %}
+                            <span class="badge badge-secondary">{{ id }}</span>
+                        {% endfor %}
+                    </td>
                 </tr>
                 {% else %}
                 <tr>
-                    <td colspan="2">No current loans.</td>
+                    <td colspan="3">No current loans.</td>
                 </tr>
                 {% endfor %}
             </tbody>
@@ -202,13 +208,13 @@
     const rentalTrendsChart = new Chart(rentalCtx, rentalTrendsConfig);
 
     function toggleCustomDateInputs() {
-    var timeFilter = document.getElementById('time_filter').value;
-    var customDateInputs = document.getElementById('custom_date_inputs');
-    if (timeFilter === 'custom') {
-        customDateInputs.style.display = 'block';
-    } else {
-        customDateInputs.style.display = 'none';
+        var timeFilter = document.getElementById('time_filter').value;
+        var customDateInputs = document.getElementById('custom_date_inputs');
+        if (timeFilter === 'custom') {
+            customDateInputs.style.display = 'block';
+        } else {
+            customDateInputs.style.display = 'none';
+        }
     }
-}
 </script>
 {% endblock %}
