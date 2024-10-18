@@ -23,7 +23,7 @@ def toggle_charge_status(wt_id):
     wt = WalkieTalkie.query.get_or_404(wt_id)
     wt.is_charged = not wt.is_charged
     db.session.commit()
-    flash(f'Walkie-Talkie ID {wt.id} charge status updated.')
+    flash(f'Walkie-Talkie ID {wt.id} charge status updated.', 'warning')
     return redirect(url_for('index'))
 
 # routes.py
@@ -169,7 +169,7 @@ def edit_walkie_talkie(wt_id):
 def delete_walkie_talkie(wt_id):
     wt = WalkieTalkie.query.get_or_404(wt_id)
     if wt.rental_history:
-        flash('Cannot delete walkie-talkie with rental history.')
+        flash('Cannot delete walkie-talkie with rental history.', 'warning')
         return redirect(url_for('index'))
     db.session.delete(wt)
     db.session.commit()
@@ -186,12 +186,12 @@ def delete_department(dept_id):
     # Check if any walkie-talkies are currently lent to this department/person
     lent_walkie_talkies = Rental.query.filter_by(department_id=dept_id, return_time=None).all()
     if lent_walkie_talkies:
-        flash('Cannot delete department/person with walkie-talkies currently lent to them.')
+        flash('Cannot delete department/person with walkie-talkies currently lent to them.', 'warning')
         return redirect(url_for('departments'))
     # Delete the department/person
     db.session.delete(department)
     db.session.commit()
-    flash('Department/Person deleted successfully.')
+    flash('Department/Person deleted successfully.', 'success')
     return redirect(url_for('departments'))
 
 @app.route('/analytics', methods=['GET'])
@@ -209,11 +209,11 @@ def analytics():
             start_date = datetime.strptime(start_date_str, '%Y-%m-%dT%H:%M')
             end_date = datetime.strptime(end_date_str, '%Y-%m-%dT%H:%M')
             if start_date >= end_date:
-                flash('Start date must be before end date.')
+                flash('Start date must be before end date.', 'warning')
                 start_date = now - timedelta(days=7)
                 end_date = now
         except ValueError:
-            flash('Invalid date format.')
+            flash('Invalid date format.', 'warning')
             start_date = now - timedelta(days=7)
             end_date = now
     else:
