@@ -21,10 +21,15 @@
         <input type="number" name="channel" id="channel" class="form-control" placeholder="Channel Number" min="1">
     </div>
     <div class="col-md-2 d-flex align-items-end">
-        <!-- Optional: Retain the Search button as a fallback -->
         <button type="submit" class="btn btn-primary w-100">Search</button>
     </div>
 </form>
+
+<!-- Bulk Actions Buttons -->
+<div class="mb-3">
+    <button id="bulk-lend-btn" class="btn btn-success">Bulk Lend</button>
+    <button id="bulk-return-btn" class="btn btn-warning">Bulk Return</button>
+</div>
 
 <!-- Loading Spinner (Optional) -->
 <div id="loading-spinner" style="display: none;" class="text-center mb-3">
@@ -37,8 +42,9 @@
 <table class="table table-striped table-bordered" id="walkie-talkies-table">
     <thead>
         <tr>
+            <th><input type="checkbox" id="select-all"></th>
             <th>ID</th>
-            <th>Channel</th>
+            <th>Channel(s)</th>
             <th>Status</th>
             <th>Charging Status</th> <!-- Updated Column Header -->
             <th>Current Holder</th>
@@ -55,204 +61,329 @@
     No walkie-talkies found matching your criteria.
 </p>
 
-<a href="{{ url_for('add_walkie_talkie') }}" class="btn btn-success">Add New Walkie-Talkie</a>
-
 <!-- Pagination Controls (Optional) -->
 <nav aria-label="Page navigation" id="pagination-nav">
   <!-- Pagination buttons will be dynamically generated -->
 </nav>
 
-<!-- Initialize tooltips -->
+<!-- Bulk Lend Modal -->
+<div class="modal fade" id="bulkLendModal" tabindex="-1" aria-labelledby="bulkLendModalLabel" aria-hidden="true">
+  <div class="modal-dialog">
+    <form id="bulk-lend-form">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title">Bulk Lend Walkie-Talkies</h5>
+          <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+            <span aria-hidden="true">&times;</span>
+          </button>
+        </div>
+        
+        <div class="modal-body">
+          <label for="bulk-department">Select Department/Person:</label>
+          <select name="department" id="bulk-department" class="form-control" required>
+              {% for dept in departments %}
+                  <option value="{{ dept.id }}">{{ dept.name }}</option>
+              {% endfor %}
+          </select>
+        </div>
+        
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancel</button>
+          <button type="submit" class="btn btn-success">Lend Selected</button>
+        </div>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Bulk Return Modal -->
+<div class="modal fade" id="bulkReturnModal" tabindex="-1" aria-labelledby="bulkReturnModalLabel" aria-hidden="true">
+  <div class="modal-dialog">
+    <form id="bulk-return-form">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title">Bulk Return Walkie-Talkies</h5>
+          <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+            <span aria-hidden="true">&times;</span>
+          </button>
+        </div>
+        
+        <div class="modal-body">
+          <p>Are you sure you want to return the selected walkie-talkies?</p>
+        </div>
+        
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancel</button>
+          <button type="submit" class="btn btn-warning">Return Selected</button>
+        </div>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Initialize tooltips and modals -->
 <script>
     $(document).ready(function(){
         $('[data-toggle="tooltip"]').tooltip();
-    });
-</script>
 
-<!-- Custom JavaScript for Real-Time Search and Handling No Results -->
-<script>
-$(document).ready(function() {
-    // Function to fetch and display walkie-talkies
-    function fetchWalkieTalkies(page = 1) {
-        // Show loading spinner
-        $('#loading-spinner').show();
-        // Hide no results message
-        $('#no-results-message').hide();
+        // Handle Select All checkbox
+        $('#select-all').on('change', function(){
+            $('input.walkie-select').prop('checked', $(this).prop('checked'));
+        });
 
-        // Get filter values
-        var search = $('#search').val().trim();
-        var status = $('#status').val();
-        var channel = $('#channel').val().trim();
+        // Fetch walkie-talkies on page load
+        fetchWalkieTalkies();
 
-        // Build query parameters
-        var params = { page: page };
-        if (search !== '') {
-            params.search = search;
-        }
-        if (status !== 'all') {
-            params.status = status;
-        }
-        if (channel !== '') {
-            params.channel = channel;
-        }
+        // Function to fetch and display walkie-talkies
+        function fetchWalkieTalkies(page = 1) {
+            $('#loading-spinner').show();
+            $('#no-results-message').hide();
 
-        // Send AJAX GET request to the API
-        $.ajax({
-            url: "{{ url_for('api_walkie_talkies') }}",
-            type: 'GET',
-            data: params,
-            dataType: 'json',
-            success: function(response) {
-                // Hide loading spinner
-                $('#loading-spinner').hide();
+            var search = $('#search').val().trim();
+            var status = $('#status').val();
+            var channel = $('#channel').val().trim();
 
-                // Clear existing table body
-                $('#walkie-talkies-table tbody').empty();
+            var params = { page: page };
+            if (search !== '') {
+                params.search = search;
+            }
+            if (status !== 'all') {
+                params.status = status;
+            }
+            if (channel !== '') {
+                params.channel = channel;
+            }
 
-                // Check if walkie-talkies are present
-                if (response.walkie_talkies.length > 0) {
-                    // Iterate through walkie-talkies and append rows
-                    $.each(response.walkie_talkies, function(index, wt) {
-                        // Determine status badge
-                        var statusBadge = wt.is_lent ? 
-                            '<span class="badge badge-danger">Lent</span>' : 
-                            '<span class="badge badge-success">Available</span>';
+            $.ajax({
+                url: "{{ url_for('api_walkie_talkies') }}",
+                type: 'GET',
+                data: params,
+                dataType: 'json',
+                success: function(response) {
+                    $('#loading-spinner').hide();
+                    $('#walkie-talkies-table tbody').empty();
 
-                        // Determine charging status badge with battery icons
-                        var chargingBadge = wt.is_charged ? 
-                            '<i class="fas fa-battery-full text-success battery-icon" title="Charged"></i>' : 
-                            '<i class="fas fa-battery-empty text-danger battery-icon" title="Discharged"></i>';
+                    if (response.walkie_talkies.length > 0) {
+                        $.each(response.walkie_talkies, function(index, wt) {
+                            // Concatenate multiple channels
+                            var channels = wt.channels.join(', ');
+                            
+                            // Determine status badge
+                            var statusBadge = wt.is_lent ? 
+                                '<span class="badge badge-danger">Lent</span>' : 
+                                '<span class="badge badge-success">Available</span>';
 
-                        // Determine action buttons
-                        var actionButtons = '<a href="/walkie_talkie/' + wt.id + '" class="btn btn-info btn-sm">View</a> ';
-                        if (!wt.is_lent) {
-                            actionButtons += '<a href="/lend_walkie_talkie/' + wt.id + '" class="btn btn-primary btn-sm">Lend</a>';
-                        } else {
-                            actionButtons += '<a href="/return_walkie_talkie/' + wt.id + '" class="btn btn-warning btn-sm">Return</a>';
-                        }
+                            // Determine charging status badge with battery icons
+                            var chargingBadge = wt.is_charged ? 
+                                '<i class="fas fa-battery-full text-success battery-icon" title="Charged"></i>' : 
+                                '<i class="fas fa-battery-empty text-danger battery-icon" title="Discharged"></i>';
 
-                        // Append the row
+                            // Determine action buttons
+                            var actionButtons = '<a href="/walkie_talkie/' + wt.id + '" class="btn btn-sm btn-info" data-toggle="tooltip" title="View Details">View</a> ';
+                            actionButtons += '<a href="/edit_walkie_talkie/' + wt.id + '" class="btn btn-sm btn-warning" data-toggle="tooltip" title="Edit">Edit</a> ';
+                            if (!wt.is_lent) {
+                                actionButtons += '<a href="/lend_walkie_talkie/' + wt.id + '" class="btn btn-sm btn-success" data-toggle="tooltip" title="Lend">Lend</a> ';
+                            } else {
+                                actionButtons += '<a href="/return_walkie_talkie/' + wt.id + '" class="btn btn-sm btn-info" data-toggle="tooltip" title="Return" onclick="return confirm(\'Are you sure you want to return this walkie-talkie?\');">Return</a> ';
+                            }
+                            actionButtons += '<form action="/toggle_charge_status/' + wt.id + '" method="post" style="display:inline;">' +
+                                '<button type="submit" class="btn btn-sm ' + (wt.is_charged ? 'btn-secondary' : 'btn-success') + '" data-toggle="tooltip" title="Toggle Charge Status">' +
+                                (wt.is_charged ? '<i class="fas fa-battery-empty"></i> Discharge' : '<i class="fas fa-battery-full"></i> Charge') +
+                                '</button>' +
+                                '</form> ';
+                            actionButtons += '<form action="/delete_walkie_talkie/' + wt.id + '" method="post" style="display:inline;">' +
+                                '<button type="submit" class="btn btn-sm btn-danger" onclick="return confirm(\'Are you sure you want to delete this walkie-talkie?\');" data-toggle="tooltip" title="Delete">' +
+                                '<i class="fas fa-trash-alt"></i> Delete' +
+                                '</button>' +
+                                '</form>';
+
+                            $('#walkie-talkies-table tbody').append(
+                                '<tr' + (wt.is_lent ? ' class="lent-row"' : '') + '>' +
+                                    '<td><input type="checkbox" class="walkie-select" value="' + wt.id + '"></td>' +
+                                    '<td>' + wt.id + '</td>' +
+                                    '<td>' + channels + '</td>' +
+                                    '<td>' + statusBadge + '</td>' +
+                                    '<td>' + chargingBadge + '</td>' +
+                                    '<td>' + wt.current_holder + '</td>' +
+                                    '<td>' + actionButtons + '</td>' +
+                                '</tr>'
+                            );
+                        });
+                    } else {
+                        $('#no-results-message').show();
+                    }
+
+                    // Handle Pagination (if implemented)
+                    if (response.pages && response.pages > 1) {
+                        renderPagination(response);
+                    } else {
+                        $('#pagination-nav').empty();
+                    }
+                },
+                error: function(xhr, status, error) {
+                    $('#loading-spinner').hide();
+                    $('#walkie-talkies-table tbody').empty();
+                    $('#no-results-message').hide();
+                    if (xhr.responseJSON && xhr.responseJSON.error) {
                         $('#walkie-talkies-table tbody').append(
-                            '<tr' + (wt.is_lent ? ' class="lent-row"' : '') + '>' +
-                                '<td>' + wt.id + '</td>' +
-                                '<td>' + wt.channel + '</td>' +
-                                '<td>' + statusBadge + '</td>' +
-                                '<td>' + chargingBadge + '</td>' + // Updated Charging Status Column
-                                '<td>' + wt.current_holder + '</td>' +
-                                '<td>' + actionButtons + '</td>' +
-                            '</tr>'
+                            '<tr><td colspan="7" class="text-center text-danger">Error: ' + xhr.responseJSON.error + '</td></tr>'
                         );
-                    });
-                } else {
-                    // Show no results message
-                    $('#no-results-message').show();
+                    } else {
+                        $('#walkie-talkies-table tbody').append(
+                            '<tr><td colspan="7" class="text-center text-danger">An unexpected error occurred.</td></tr>'
+                        );
+                    }
                 }
+            });
+        }
 
-                // Handle Pagination (If Implemented)
-                if (response.pages && response.pages > 1) {
-                    renderPagination(response);
+        // Function to render pagination controls (Optional)
+        function renderPagination(response) {
+            $('#pagination-nav').empty();
+            var paginationHTML = '<ul class="pagination justify-content-center">';
+            
+            // Previous button
+            if (response.has_prev) {
+                paginationHTML += '<li class="page-item"><a class="page-link" href="#" data-page="' + (response.current_page - 1) + '">Previous</a></li>';
+            } else {
+                paginationHTML += '<li class="page-item disabled"><a class="page-link" href="#">Previous</a></li>';
+            }
+
+            // Page numbers
+            for (var i = 1; i <= response.pages; i++) {
+                if (i === response.current_page) {
+                    paginationHTML += '<li class="page-item active"><a class="page-link" href="#" data-page="' + i + '">' + i + '</a></li>';
                 } else {
-                    $('#pagination-nav').empty();
+                    paginationHTML += '<li class="page-item"><a class="page-link" href="#" data-page="' + i + '">' + i + '</a></li>';
                 }
-            },
-            error: function(xhr, status, error) {
-                // Hide loading spinner
-                $('#loading-spinner').hide();
+            }
 
-                // Clear existing table body
-                $('#walkie-talkies-table tbody').empty();
+            // Next button
+            if (response.has_next) {
+                paginationHTML += '<li class="page-item"><a class="page-link" href="#" data-page="' + (response.current_page + 1) + '">Next</a></li>';
+            } else {
+                paginationHTML += '<li class="page-item disabled"><a class="page-link" href="#">Next</a></li>';
+            }
 
-                // Hide no results message
-                $('#no-results-message').hide();
+            paginationHTML += '</ul>';
+            $('#pagination-nav').append(paginationHTML);
+        }
 
-                if (xhr.responseJSON && xhr.responseJSON.error) {
-                    $('#walkie-talkies-table tbody').append(
-                        '<tr><td colspan="6" class="text-center text-danger">Error: ' + xhr.responseJSON.error + '</td></tr>'
-                    );
-                } else {
-                    $('#walkie-talkies-table tbody').append(
-                        '<tr><td colspan="6" class="text-center text-danger">An unexpected error occurred.</td></tr>'
-                    );
-                }
+        // Debounce function to limit the rate of AJAX calls
+        function debounce(func, delay) {
+            var inDebounce;
+            return function() {
+                var context = this;
+                var args = arguments;
+                clearTimeout(inDebounce);
+                inDebounce = setTimeout(function() {
+                    func.apply(context, args);
+                }, delay);
+            }
+        }
+
+        // Event listeners for real-time search and filter
+        $('#search').on('keyup', debounce(function() {
+            fetchWalkieTalkies();
+        }, 300)); // 300ms delay
+
+        $('#status').on('change', function() {
+            fetchWalkieTalkies();
+        });
+
+        $('#channel').on('keyup', debounce(function() {
+            fetchWalkieTalkies();
+        }, 300)); // 300ms delay
+
+        // Handle form submission if the search button is pressed
+        $('#search-form').on('submit', function(e) {
+            e.preventDefault(); // Prevent default form submission
+            fetchWalkieTalkies();
+        });
+
+        // Event listener for pagination clicks (If Implemented)
+        $(document).on('click', '.pagination a.page-link', function(e) {
+            e.preventDefault();
+            var page = $(this).data('page');
+            if (page) {
+                fetchWalkieTalkies(page);
             }
         });
-    }
 
-    // Function to render pagination controls (Optional)
-    function renderPagination(response) {
-        $('#pagination-nav').empty();
-        var paginationHTML = '<ul class="pagination justify-content-center">';
-        
-        // Previous button
-        if (response.has_prev) {
-            paginationHTML += '<li class="page-item"><a class="page-link" href="#" data-page="' + (response.current_page - 1) + '">Previous</a></li>';
-        } else {
-            paginationHTML += '<li class="page-item disabled"><a class="page-link" href="#">Previous</a></li>';
-        }
-
-        // Page numbers
-        for (var i = 1; i <= response.pages; i++) {
-            if (i === response.current_page) {
-                paginationHTML += '<li class="page-item active"><a class="page-link" href="#" data-page="' + i + '">' + i + '</a></li>';
-            } else {
-                paginationHTML += '<li class="page-item"><a class="page-link" href="#" data-page="' + i + '">' + i + '</a></li>';
+        // Handle Bulk Lend Button Click
+        $('#bulk-lend-btn').on('click', function() {
+            var selected = $('.walkie-select:checked').map(function() { return this.value; }).get();
+            if (selected.length === 0) {
+                alert('Please select at least one walkie-talkie to lend.');
+                return;
             }
-        }
+            // Populate the departments dropdown in the modal
+            $('#bulkLendModal').modal('show');
+        });
 
-        // Next button
-        if (response.has_next) {
-            paginationHTML += '<li class="page-item"><a class="page-link" href="#" data-page="' + (response.current_page + 1) + '">Next</a></li>';
-        } else {
-            paginationHTML += '<li class="page-item disabled"><a class="page-link" href="#">Next</a></li>';
-        }
+        // Handle Bulk Lend Form Submission
+        $('#bulk-lend-form').on('submit', function(e) {
+            e.preventDefault();
+            var selected = $('.walkie-select:checked').map(function() { return this.value; }).get();
+            var department_id = $('#bulk-department').val();
+            if (selected.length === 0) {
+                alert('No walkie-talkies selected.');
+                return;
+            }
+            // Send AJAX POST request to bulk lend route
+            $.ajax({
+                url: "{{ url_for('bulk_lend_walkie_talkies') }}",
+                type: 'POST',
+                contentType: 'application/json',
+                data: JSON.stringify({
+                    walkie_ids: selected,
+                    department_id: department_id
+                }),
+                success: function(response) {
+                    $('#bulkLendModal').modal('hide');
+                    fetchWalkieTalkies();
+                },
+                error: function(xhr, status, error) {
+                    alert('Error during bulk lend: ' + (xhr.responseJSON.error || error));
+                }
+            });
+        });
 
-        paginationHTML += '</ul>';
-        $('#pagination-nav').append(paginationHTML);
-    }
+        // Handle Bulk Return Button Click
+        $('#bulk-return-btn').on('click', function() {
+            var selected = $('.walkie-select:checked').map(function() { return this.value; }).get();
+            if (selected.length === 0) {
+                alert('Please select at least one walkie-talkie to return.');
+                return;
+            }
+            $('#bulkReturnModal').modal('show');
+        });
 
-    // Initial fetch on page load
-    fetchWalkieTalkies();
-
-    // Debounce function to limit the rate of AJAX calls
-    function debounce(func, delay) {
-        var inDebounce;
-        return function() {
-            var context = this;
-            var args = arguments;
-            clearTimeout(inDebounce);
-            inDebounce = setTimeout(function() {
-                func.apply(context, args);
-            }, delay);
-        }
-    }
-
-    // Event listeners for real-time search and filter
-    $('#search').on('keyup', debounce(function() {
-        fetchWalkieTalkies();
-    }, 300)); // 300ms delay
-
-    $('#status').on('change', function() {
-        fetchWalkieTalkies();
+        // Handle Bulk Return Form Submission
+        $('#bulk-return-form').on('submit', function(e) {
+            e.preventDefault();
+            var selected = $('.walkie-select:checked').map(function() { return this.value; }).get();
+            if (selected.length === 0) {
+                alert('No walkie-talkies selected.');
+                return;
+            }
+            // Send AJAX POST request to bulk return route
+            $.ajax({
+                url: "{{ url_for('bulk_return_walkie_talkies') }}",
+                type: 'POST',
+                contentType: 'application/json',
+                data: JSON.stringify({
+                    walkie_ids: selected
+                }),
+                success: function(response) {
+                    $('#bulkReturnModal').modal('hide');
+                    fetchWalkieTalkies();
+                },
+                error: function(xhr, status, error) {
+                    alert('Error during bulk return: ' + (xhr.responseJSON.error || error));
+                }
+            });
+        });
     });
-
-    $('#channel').on('keyup', debounce(function() {
-        fetchWalkieTalkies();
-    }, 300)); // 300ms delay
-
-    // Handle form submission if the search button is pressed
-    $('#search-form').on('submit', function(e) {
-        e.preventDefault(); // Prevent default form submission
-        fetchWalkieTalkies();
-    });
-
-    // Event listener for pagination clicks (If Implemented)
-    $(document).on('click', '.pagination a.page-link', function(e) {
-        e.preventDefault();
-        var page = $(this).data('page');
-        if (page) {
-            fetchWalkieTalkies(page);
-        }
-    });
-});
 </script>
 {% endblock %}

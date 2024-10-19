@@ -1,12 +1,13 @@
 # routes.py
 from app import app
-from models import db, WalkieTalkie, Department, Rental, get_ist_now
+from models import db, WalkieTalkie, Department, Rental, get_ist_now, Channel
 from datetime import datetime, timedelta
 from sqlalchemy import func
 from flask import Flask, render_template, request, redirect, url_for, flash, jsonify
 from sqlalchemy import or_
 import json
 from collections import defaultdict
+from sqlalchemy.orm import joinedload
 
 
 
@@ -30,11 +31,12 @@ def toggle_charge_status(wt_id):
 
 # routes.py
 
+# routes.py
 @app.route('/add_walkie_talkie', methods=['GET', 'POST'])
 def add_walkie_talkie():
     if request.method == 'POST':
         id_input = request.form.get('id')
-        channel_input = request.form.get('channel')
+        channel_inputs = request.form.getlist('channels')  # Get multiple channels
         
         # Handle ID
         if id_input:
@@ -51,22 +53,44 @@ def add_walkie_talkie():
             last_wt = WalkieTalkie.query.order_by(WalkieTalkie.id.desc()).first()
             id_value = last_wt.id + 1 if last_wt else 1
         
-        # Handle Channel
-        if channel_input:
-            try:
-                channel = int(channel_input)
-            except ValueError:
-                error = 'Invalid channel number.'
-                return render_template('add_walkie_talkie.html', error=error)
-        else:
-            channel = 1  # Default channel
+        # Handle Channels
+        channels = []
+        for ch in channel_inputs:
+            if ch.strip():
+                try:
+                    ch_num = int(ch)
+                    if ch_num < 1:
+                        raise ValueError
+                    if ch_num in channels:
+                        raise ValueError('Duplicate channel number.')
+                    channels.append(ch_num)
+                except ValueError:
+                    error = 'Invalid channel number entered.'
+                    return render_template('add_walkie_talkie.html', error=error)
         
-        # Set is_charged to False (discharged) by default
-        wt = WalkieTalkie(id=id_value, channel=channel, is_charged=False)
+        # If no channels provided, set default channel 1
+        if not channels:
+            channels = [1]
+        
+        # Check for duplicate channels in the same walkie-talkie
+        if len(channels) != len(set(channels)):
+            error = 'Duplicate channel numbers are not allowed.'
+            return render_template('add_walkie_talkie.html', error=error)
+        
+        # Create WalkieTalkie instance
+        wt = WalkieTalkie(id=id_value)
         db.session.add(wt)
+        
+        # Create Channel instances
+        for ch_num in channels:
+            channel = Channel(channel_number=ch_num, walkie_talkie=wt)
+            db.session.add(channel)
+        
         db.session.commit()
+        flash('Walkie-Talkie added successfully with channels.', 'success')
         return redirect(url_for('index'))
     return render_template('add_walkie_talkie.html')
+
 
 
 @app.route('/walkie_talkie/<int:wt_id>')
@@ -78,7 +102,7 @@ def view_walkie_talkie(wt_id):
 @app.route('/lend_walkie_talkie/<int:wt_id>', methods=['GET', 'POST'])
 def lend_walkie_talkie(wt_id):
     wt = WalkieTalkie.query.get_or_404(wt_id)
-    departments = Department.query.all()
+    departments = Department.query.order_by(Department.name.asc()).all()
     if not departments:
         return render_template('lend_walkie_talkie.html', wt=wt, departments=[])
     if request.method == 'POST':
@@ -122,12 +146,13 @@ def add_department():
         return redirect(url_for('departments'))
     return render_template('add_department.html')
 
+# routes.py
 @app.route('/edit_walkie_talkie/<int:wt_id>', methods=['GET', 'POST'])
 def edit_walkie_talkie(wt_id):
     wt = WalkieTalkie.query.get_or_404(wt_id)
     if request.method == 'POST':
         id_input = request.form.get('id')
-        channel_input = request.form.get('channel')
+        channel_inputs = request.form.getlist('channels')  # Get multiple channels
         
         # Handle ID change
         if id_input:
@@ -143,29 +168,54 @@ def edit_walkie_talkie(wt_id):
             error = 'ID is required.'
             return render_template('edit_walkie_talkie.html', wt=wt, error=error)
         
-        # Update Rentals if ID changes
-        if new_id != wt.id:
+        # Handle Channels
+        channels = []
+        for ch in channel_inputs:
+            if ch.strip():
+                try:
+                    ch_num = int(ch)
+                    if ch_num < 1:
+                        raise ValueError
+                    if ch_num in channels:
+                        raise ValueError('Duplicate channel number.')
+                    channels.append(ch_num)
+                except ValueError:
+                    error = 'Invalid channel number entered.'
+                    return render_template('edit_walkie_talkie.html', wt=wt, error=error)
+        
+        # If no channels provided, set default channel 1
+        if not channels:
+            channels = [1]
+        
+        # Check for duplicate channels in the same walkie-talkie
+        if len(channels) != len(set(channels)):
+            error = 'Duplicate channel numbers are not allowed.'
+            return render_template('edit_walkie_talkie.html', wt=wt, error=error)
+        
+        # Update WalkieTalkie ID
+        if id_input and int(id_input) != wt.id:
             # Update foreign keys in Rental
             rentals = Rental.query.filter_by(walkie_talkie_id=wt.id).all()
             for rental in rentals:
-                rental.walkie_talkie_id = new_id
-            wt.id = new_id  # Update the walkie-talkie's ID
+                rental.walkie_talkie_id = int(id_input)
+            wt.id = int(id_input)
         
-        # Handle Channel
-        if channel_input:
-            try:
-                wt.channel = int(channel_input)
-            except ValueError:
-                error = 'Invalid channel number.'
-                return render_template('edit_walkie_talkie.html', wt=wt, error=error)
-        else:
-            wt.channel = 1  # Default channel
-
+        # Update Channels
+        # Remove existing channels
+        Channel.query.filter_by(walkie_talkie_id=wt.id).delete()
+        # Add new channels
+        for ch_num in channels:
+            channel = Channel(channel_number=ch_num, walkie_talkie=wt)
+            db.session.add(channel)
+        
+        # Update other fields
         wt.is_charged = 'is_charged' in request.form
 
         db.session.commit()
+        flash('Walkie-Talkie updated successfully.', 'success')
         return redirect(url_for('view_walkie_talkie', wt_id=wt.id))
     return render_template('edit_walkie_talkie.html', wt=wt)
+
 
 @app.route('/delete_walkie_talkie/<int:wt_id>', methods=['POST'])
 def delete_walkie_talkie(wt_id):
@@ -179,7 +229,7 @@ def delete_walkie_talkie(wt_id):
 
 @app.route('/departments')
 def departments():
-    departments = Department.query.all()
+    departments = Department.query.order_by(Department.name.asc()).all()
     return render_template('departments.html', departments=departments)
 
 @app.route('/delete_department/<int:dept_id>', methods=['POST'])
@@ -416,27 +466,22 @@ def delete_rental_history(wt_id):
 
 @app.route('/walkie_talkies', methods=['GET'])
 def list_walkie_talkies():
-    """
-    Renders the walkie-talkies listing page.
-    Initially loads all walkie-talkies; subsequent filtering is handled via AJAX.
-    """
-    return render_template('list_walkie_talkies.html')
+    departments = Department.query.order_by(Department.name.asc()).all()
+    return render_template('list_walkie_talkies.html', departments=departments)
 
 
+
+# routes.py
 
 @app.route('/api/walkie_talkies', methods=['GET'])
 def api_walkie_talkies():
-    """
-    API endpoint to fetch walkie-talkie data based on search and filter parameters.
-    Returns JSON data.
-    """
     # Retrieve query parameters
     search_query = request.args.get('search', '').strip()
     filter_status = request.args.get('status', 'all').lower()
     filter_channel = request.args.get('channel', '').strip()
 
     # Start building the query
-    walkie_talkies_query = WalkieTalkie.query
+    walkie_talkies_query = WalkieTalkie.query.options(joinedload(WalkieTalkie.channels))
 
     # Apply search filter (e.g., by ID)
     if search_query:
@@ -461,7 +506,9 @@ def api_walkie_talkies():
     # Apply channel filter
     if filter_channel:
         if filter_channel.isdigit() and int(filter_channel) > 0:
-            walkie_talkies_query = walkie_talkies_query.filter_by(channel=int(filter_channel))
+            walkie_talkies_query = walkie_talkies_query.filter(
+                WalkieTalkie.channels.any(channel_number=int(filter_channel))
+            )
         else:
             return jsonify({'error': 'Please enter a valid positive integer for channel number.'}), 400
 
@@ -473,10 +520,84 @@ def api_walkie_talkies():
     for wt in walkie_talkies:
         walkie_talkies_data.append({
             'id': wt.id,
-            'channel': wt.channel,
+            'channels': [c.channel_number for c in wt.channels],  # Updated to retrieve all channels
             'is_lent': wt.is_lent,
             'is_charged': wt.is_charged,
             'current_holder': wt.current_holder if wt.current_holder else 'N/A'
         })
 
     return jsonify({'walkie_talkies': walkie_talkies_data}), 200
+
+
+
+@app.route('/bulk_lend_walkie_talkies', methods=['POST'])
+def bulk_lend_walkie_talkies():
+    data = request.get_json()
+    walkie_ids = data.get('walkie_ids')
+    department_id = data.get('department_id')
+    
+    if not walkie_ids or not department_id:
+        return jsonify({'error': 'Walkie IDs and Department ID are required.'}), 400
+    
+    # Validate department
+    department = Department.query.get(department_id)
+    if not department:
+        return jsonify({'error': 'Department/Person not found.'}), 404
+    
+    # Validate walkie-talkies
+    walkies = WalkieTalkie.query.filter(WalkieTalkie.id.in_(walkie_ids)).all()
+    if not walkies:
+        return jsonify({'error': 'No valid walkie-talkies found.'}), 404
+    
+    # Check if any walkie-talkies are already lent
+    already_lent = [wt.id for wt in walkies if wt.is_lent]
+    if already_lent:
+        return jsonify({'error': f'Walkie-Talkies with IDs {", ".join(map(str, already_lent))} are already lent out.'}), 400
+    
+    # Proceed to lend walkie-talkies
+    try:
+        for wt in walkies:
+            rental = Rental(walkie_talkie_id=wt.id, department_id=department.id)
+            wt.is_lent = True
+            wt.current_holder = department.name
+            db.session.add(rental)
+        db.session.commit()
+        flash('Selected walkie-talkies have been lent out successfully.', 'success')
+        return jsonify({'message': 'Bulk lend successful.'}), 200
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': f'An error occurred during bulk lend: {str(e)}'}), 500
+
+@app.route('/bulk_return_walkie_talkies', methods=['POST'])
+def bulk_return_walkie_talkies():
+    data = request.get_json()
+    walkie_ids = data.get('walkie_ids')
+    
+    if not walkie_ids:
+        return jsonify({'error': 'Walkie IDs are required.'}), 400
+    
+    # Validate walkie-talkies
+    walkies = WalkieTalkie.query.filter(WalkieTalkie.id.in_(walkie_ids)).all()
+    if not walkies:
+        return jsonify({'error': 'No valid walkie-talkies found.'}), 404
+    
+    # Check if any walkie-talkies are not lent
+    not_lent = [wt.id for wt in walkies if not wt.is_lent]
+    if not_lent:
+        return jsonify({'error': f'Walkie-Talkies with IDs {", ".join(map(str, not_lent))} are not currently lent out.'}), 400
+    
+    # Proceed to return walkie-talkies
+    try:
+        for wt in walkies:
+            rental = Rental.query.filter_by(walkie_talkie_id=wt.id, return_time=None).first()
+            if rental:
+                rental.return_time = get_ist_now()
+                wt.is_lent = False
+                wt.current_holder = None
+                wt.is_charged = False  # Set to discharged upon return
+        db.session.commit()
+        flash('Selected walkie-talkies have been returned successfully.', 'success')
+        return jsonify({'message': 'Bulk return successful.'}), 200
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': f'An error occurred during bulk return: {str(e)}'}), 500

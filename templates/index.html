@@ -1,3 +1,4 @@
+<!-- templates/index.html -->
 {% extends 'base.html' %}
 {% block content %}
 <div class="row mb-4">
@@ -27,7 +28,7 @@
     <thead class="thead-dark">
         <tr>
             <th>ID</th>
-            <th>Channel</th>
+            <th>Channel(s)</th> <!-- Updated Header -->
             <th>Status</th>
             <th>Charged</th>
             <th>Current Holder</th>
@@ -38,7 +39,11 @@
         {% for wt in walkie_talkies %}
         <tr class="{% if wt.is_lent %}lent-row{% endif %}">
             <td>{{ wt.id }}</td>
-            <td>{{ wt.channel }}</td>
+            <td>
+                {% for channel in wt.channels %}
+                    <span class="badge badge-info">{{ channel.channel_number }}</span>
+                {% endfor %}
+            </td>
             <td>
                 {% if wt.is_lent %}
                     <span class="badge badge-danger" data-toggle="tooltip" title="Lent to {{ wt.current_holder }}">
@@ -74,14 +79,13 @@
                         <i class="fas fa-share-square"></i>
                     </a>
                 {% else %}
-                  <a href="{{ url_for('return_walkie_talkie', wt_id=wt.id) }}" 
-                    class="btn btn-sm btn-info" 
-                    data-toggle="tooltip" 
-                    title="Return" 
-                    onclick="return confirm('Are you sure you want to return this walkie-talkie?');">
-                    <i class="fas fa-undo"></i>
-                  </a>
-             
+                    <a href="{{ url_for('return_walkie_talkie', wt_id=wt.id) }}" 
+                        class="btn btn-sm btn-info" 
+                        data-toggle="tooltip" 
+                        title="Return" 
+                        onclick="return confirm('Are you sure you want to return this walkie-talkie?');">
+                        <i class="fas fa-undo"></i>
+                    </a>
                 {% endif %}
                 <form action="{{ url_for('toggle_charge_status', wt_id=wt.id) }}" method="post" style="display:inline;">
                     <button type="submit" class="btn btn-sm {% if wt.is_charged %}btn-secondary{% else %}btn-success{% endif %}" data-toggle="tooltip" title="Toggle Charge Status">
@@ -94,7 +98,7 @@
                 </form>
                 <form action="{{ url_for('delete_walkie_talkie', wt_id=wt.id) }}" method="post" style="display:inline;">
                     <button type="submit" class="btn btn-sm btn-danger" onclick="return confirm('Are you sure you want to delete this walkie-talkie?');" data-toggle="tooltip" title="Delete">
-                        <i class="fas fa-trash-alt"></i>
+                        <i class="fas fa-trash-alt"></i> Delete
                     </button>
                 </form>
             </td>

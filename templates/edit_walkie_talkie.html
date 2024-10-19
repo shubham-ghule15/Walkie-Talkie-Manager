@@ -1,3 +1,4 @@
+<!-- templates/edit_walkie_talkie.html -->
 {% extends 'base.html' %}
 {% block content %}
 <h2>Edit Walkie-Talkie ID: {{ wt.id }}</h2>
@@ -12,8 +13,28 @@
         <input type="number" class="form-control" id="id" name="id" value="{{ wt.id }}" required>
     </div>
     <div class="form-group">
-        <label for="channel">Channel (optional, default is 1):</label>
-        <input type="number" class="form-control" id="channel" name="channel" value="{{ wt.channel }}">
+        <label>Channels (press "Add Channel" to add more):</label>
+        <div id="channel-fields">
+            {% for channel in wt.channels %}
+            <div class="input-group mb-2">
+                <input type="number" class="form-control" name="channels" min="1" value="{{ channel.channel_number }}" required>
+                <div class="input-group-append">
+                    <button type="button" class="btn btn-outline-danger remove-channel-btn">Remove</button>
+                </div>
+            </div>
+            {% endfor %}
+            <!-- If no channels, show one input -->
+            {% if not wt.channels %}
+            <div class="input-group mb-2">
+                <input type="number" class="form-control" name="channels" min="1" placeholder="Channel Number" required>
+                <div class="input-group-append">
+                    <button type="button" class="btn btn-outline-secondary add-channel-btn">Add Channel</button>
+                </div>
+            </div>
+            {% else %}
+            <button type="button" class="btn btn-outline-secondary add-channel-btn">Add Channel</button>
+            {% endif %}
+        </div>
     </div>
     <div class="form-group form-check">
         <input type="checkbox" class="form-check-input" id="is_charged" name="is_charged" {% if wt.is_charged %}checked{% endif %}>
@@ -22,4 +43,33 @@
     <button type="submit" class="btn btn-primary">Update</button>
     <a href="{{ url_for('view_walkie_talkie', wt_id=wt.id) }}" class="btn btn-secondary">Cancel</a>
 </form>
+
+<!-- JavaScript to add/remove channel fields -->
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const addChannelBtns = document.querySelectorAll('.add-channel-btn');
+        const channelFields = document.getElementById('channel-fields');
+
+        addChannelBtns.forEach(function(btn) {
+            btn.addEventListener('click', function() {
+                const newChannelField = document.createElement('div');
+                newChannelField.classList.add('input-group', 'mb-2');
+                newChannelField.innerHTML = `
+                    <input type="number" class="form-control" name="channels" min="1" placeholder="Channel Number" required>
+                    <div class="input-group-append">
+                        <button type="button" class="btn btn-outline-danger remove-channel-btn">Remove</button>
+                    </div>
+                `;
+                channelFields.appendChild(newChannelField);
+            });
+        });
+
+        // Event delegation for removing channel fields
+        channelFields.addEventListener('click', function(e) {
+            if (e.target && e.target.classList.contains('remove-channel-btn')) {
+                e.target.parentElement.parentElement.remove();
+            }
+        });
+    });
+</script>
 {% endblock %}
